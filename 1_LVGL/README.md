@@ -1,6 +1,7 @@
 
 # Setup NXP IMX RT1020 LVGL Demo Project 
-- LCD : Seeed Studio 2.8inch TFT Touch Shield v2.0 (ILI9341)
+- LCD : Seeed Studio 2.8inch TFT Touch Shield v2.0 (ILI9341)<br><br>
+<img src="../resource/image_1.jpeg" width="600px"><br><br><br>
 1. Create New Project,
 	- Add `lpspi` & `lpspi_edma` driver
 	- Add `adc` driver
