@@ -48,7 +48,7 @@ int main(void) {
 
 	LV_LOG("LVGL demo started\r\n");
 
-	// LVGL Demo,
+	// ------ LVGL 9.2.1 ------
 	/* enable the flag also in lv_conf.h */
 	//lv_demo_widgets();
 	//lv_demo_stress();
@@ -57,6 +57,5 @@ int main(void) {
 	for (;;)
 	{
 		lv_timer_handler();
-		//SDK_DelayAtLeastUs(3000, CLOCK_GetFreq(kCLOCK_CoreSysClk)); // 3 ms delay
 	}
 }
