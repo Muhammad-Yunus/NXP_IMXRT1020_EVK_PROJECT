@@ -65,9 +65,7 @@ test_sdram_lpspi_edma_lcd_lvgl/
 └── xip/                XIP boot headers (DCD for SDRAM, FlexSPI NOR config)
 ```
 
-## How to Open and Build
-
-### Prerequisites
+## Prerequisites
 
 - [MCUXpresso IDE](https://www.nxp.com/design/design-center/software/development-software/mcuxpresso-software-and-tools-/mcuxpresso-integrated-development-environment-ide:MCUXpresso-IDE) (v11.x or later recommended)
 - NXP MIMXRT1020-EVK board
