@@ -1,135 +1,126 @@
+# test_sdram_lpspi_edma_lcd_lvgl
 
-# Setup NXP IMX RT1020 LVGL Demo Project 
-- LCD : Seeed Studio 2.8inch TFT Touch Shield v2.0 (ILI9341)<br><br>
-<img src="../resource/image_1.jpeg" width="600px"><br><br><br>
-1. Create New Project,
-	- Add `lpspi` & `lpspi_edma` driver
-	- Add `adc` driver
-	- Add `cache` driver
-2. Open **Project** > **MCU Xpresso Config Tool** > **Pin** 
-	- Setup `LPSPI1` Pin 
-		- LCD_CS : `[97] GPIO_AD_B0_11`
-		- LCD_CLK : `[98] GPIO_AD_B0_10`
-		- LCD_MISO : `[95] GPIO_AD_B0_13`
-		- LCD_MOSI : `[96] GPIO_AD_B0_12`
-	- Setup `GPIO1` Pin 
-		- LCD_DC : `[94] GPIO_AD_B0_14`
-	- Setup `ADC1` pin 
-		- LCD_TOUCH_YM_ADC_A0 : `[80] GPIO_AD_B1_10`
-		- LCD_TOUCH_XM_ADC_A1 : `[79] GPIO_AD_B1_11`
-		- LCD_TOUCH_YP_ADC_A2 : `[78] GPIO_AD_B1_12`
-		- LCD_TOUCH_XP_ADC_A3 : `[76] GPIO_AD_B1_13`
-3. Create new header file `board/app.h`
-    ```
-    #define LPSPI_TRANSFER_BAUDRATE 			10000000U /*! Transfer baudrate - 10MHz*/
+Bare-metal project running **LVGL 9** on the **NXP IMXRT1020-EVK** evaluation board. It drives an ILI9341 320x240 SPI LCD with a 4-wire resistive touchscreen, using DMA-accelerated SPI transfers and SDRAM-backed frame buffers. The default demo is the **LVGL Music Player**.<br>
+![](../resource/nxp_imxrt1020_evk_lvgl_thumb.jpeg)<br><br>
 
-    #define BOARD_EEPROM_LPSPI_BASEADDR 		(LPSPI1)
-    #define BOARD_LPSPI_IRQN            		LPSPI1_IRQn
-    #define BOARD_LPSPI_IRQHandler      		LPSPI1_IRQHandler
+## Hardware
 
-    #define BOARD_LPSPI_DMA_MUX_BASE          	(DMAMUX)
-    #define BOARD_LPSPI_DMA_RX_REQUEST_SOURCE 	kDmaRequestMuxLPSPI1Rx
-    #define BOARD_LPSPI_DMA_TX_REQUEST_SOURCE 	kDmaRequestMuxLPSPI1Tx
-    #define BOARD_LPSPI_DMA_BASE              	(DMA0)
-    #define BOARD_LPSPI_DMA_RX_CHANNEL        	0U
-    #define BOARD_LPSPI_DMA_TX_CHANNEL        	1U
+| Component | Details |
+|---|---|
+| Board | NXP MIMXRT1020-EVK (Cortex-M7 @ 500 MHz) |
+| Display | ILI9341 320x240 TFT LCD (16-bit RGB565, landscape) |
+| Touch | 4-wire resistive touchscreen (ADC-based, no touch IC) |
+| Flash | 8 MB QSPI NOR (XIP) |
+| SDRAM | 32 MB via SEMC (base 0x80000000) |
 
-    #define BOARD_LPSPI_PCS_FOR_INIT     		(kLPSPI_Pcs0)
-    #define BOARD_LPSPI_PCS_FOR_TRANSFER 		(kLPSPI_MasterPcs0)
+## Key Features
 
-    /* Select USB1 PLL PFD0 (392.72 MHz) as lpspi clock source */
-    #define BOARD_LPSPI_CLOCK_SOURCE_SELECT 	(1U)
-    /* Clock divider for master lpspi clock source */
-    #define BOARD_LPSPI_CLOCK_SOURCE_DIVIDER 	(7U)
+- **LPSPI with eDMA** -- LCD pixel data is transferred over LPSPI1 at 40 MHz using eDMA in continuous TX-only mode (`CONT+CONTC+BYSW+RXMSK`), enabling fully asynchronous flushing so LVGL can render the next frame while the current one is being transmitted.
+- **SDRAM frame buffers** -- Two partial-screen buffers (~30 KB each, 1/5 of screen) are placed in SDRAM. LVGL uses double-buffered partial rendering mode (`LV_DISPLAY_RENDER_MODE_PARTIAL`).
+- **D-Cache coherency** -- `DCACHE_CleanByRange()` is called before every DMA transfer to flush pixel data from cache to SDRAM, ensuring DMA reads coherent data. DMA handles themselves are placed in non-cacheable memory.
+- **SDRAM initialization via DCD** -- SDRAM is configured through the Device Configuration Data (DCD) boot header, so SEMC is fully initialized by the ROM bootloader before application code runs.
+- **4-wire resistive touch** -- Touchscreen input is read directly via ADC channels (ADC1 CH10-CH13) with software-driven pin multiplexing and 4-sample averaging.
+- **Performance monitor** -- LVGL sysmon/perf monitor is enabled to display FPS and CPU usage on screen.
 
-    #define BOARD_LPSPI_CLK_FREQ (CLOCK_GetFreq(kCLOCK_Usb1PllPfd0Clk) / (BOARD_LPSPI_CLOCK_SOURCE_DIVIDER + 1U))
-    ```
-4. Open `board/board.h`, then edit line 108,
-	- set macros `BOARD_LCD_DC_GPIO_PIN` to `14U`. 
-5. Clone **LVGL** project : https://github.com/lvgl/lvgl 
-    - use version **9.2.1** or **8.3.10**
-	- copy `lvgl/lv_conf_template.h`
-	- copy `lvgl/lv_version.h`
-	- copy `lvgl/lvgl.h`
-	- copy `lvgl/src/`
-	- copy `lvgl/demos/` (optional)
-6. Source LVGL,
-	- Select **Project** > **New** > **Add Source Folder** > choose **lvgl directory**
-	- Select **Project** > **Properties** > **C/C++ Build** > **Settings** > **MCU C Compiler** > **Includes** > Add New **Include Path** for LVGL directory
-7. Add LCD Driver,
-	- copy `drivers/fsl_ili9341.h` & `drivers/fsl_ili9341.c`
-	- copy `drivers/fsl_4pin_adc_touch.h` & `drivers/fsl_4pin_adc_touch.c`
-8. Add lvgl support ,
-	- copy `source/lv_conf.h`
-	- copy `source/lcd_support.h`
-	- copy `source/lcd_support.c`
-9. Modify main code, 
-	- Add 
-        ```	
-        #include "lvgl.h"
-        #include "lcd_support.h"
-        #include "demos/lv_demos.h"
+## Pin Assignments
 
-        void SysTick_Handler(void)
-        {
-            lv_tick_inc(1);
-        }
-        ```<br><br>
-	- Replace,
-        ```	
-        PRINTF("Hello World\r\n");
+| Signal | Pin | Function |
+|---|---|---|
+| LPSPI1_SCK | GPIO_AD_B0_10 | SPI clock |
+| LPSPI1_SDO | GPIO_AD_B0_12 | SPI MOSI |
+| LPSPI1_SDI | GPIO_AD_B0_13 | SPI MISO |
+| LCD_CS | GPIO_AD_B0_11 | Chip select (software GPIO) |
+| LCD_DC | GPIO_AD_B0_14 | Data/Command select |
+| Touch YM | GPIO_AD_B1_10 | ADC1 CH10 |
+| Touch XM | GPIO_AD_B1_11 | ADC1 CH11 |
+| Touch YP | GPIO_AD_B1_12 | ADC1 CH12 |
+| Touch XP | GPIO_AD_B1_13 | ADC1 CH13 |
 
-        /* Force the counter to be placed into memory. */
-        volatile static int i = 0 ;
-        /* Enter an infinite loop, just incrementing a counter. */
-        while(1) {
-            i++ ;
-            /* 'Dummy' NOP to allow source level single stepping of
-                tight while() loop */
-            __asm volatile ("nop");
-        }
-        return 0 ;
-        ```
-	- with,
-        ```
-            SysTick_Config(SystemCoreClock / 1000);
+## Clock Configuration
 
-            lv_init();
-            lv_port_disp_init();
-            lv_port_indev_init();
+| Domain | Frequency |
+|---|---|
+| Core (Cortex-M7) | 500 MHz |
+| AHB | 500 MHz |
+| IPG | 125 MHz |
+| LPSPI clock root | 105.6 MHz |
+| SEMC (SDRAM) | 62.5 MHz |
+| FlexSPI (QSPI) | 132 MHz |
 
-        #if LV_USE_LOG
-            lv_log_register_print_cb(print_cb);
-        #endif
+## Project Structure
 
-            LV_LOG("LVGL demo started\r\n");
+```
+test_sdram_lpspi_edma_lcd_lvgl/
+├── board/              Board BSP (clock, pin mux, peripherals, MPU)
+├── CMSIS/              ARM CMSIS core headers
+├── component/uart/     LPUART adapter
+├── device/             MIMXRT1021 device headers and register definitions
+├── drivers/            NXP SDK drivers (LPSPI, eDMA, ADC, ILI9341, GPIO, etc.)
+├── source/             Application code
+│   ├── test_sdram_lpspi_edma_lcd_lvgl.c   Main entry point
+│   ├── lcd_support.c/h                    LCD + touch port layer for LVGL
+│   └── lv_conf.h                          LVGL configuration
+├── startup/            Cortex-M7 startup and vector table
+├── utilities/          Debug console
+└── xip/                XIP boot headers (DCD for SDRAM, FlexSPI NOR config)
+```
 
-            // LVGL Demo,
-            /* enable the flag also in lv_conf.h */
-            //lv_demo_widgets();
-            //lv_demo_stress();
-            lv_demo_music();
+## How to Open and Build
 
-            for (;;)
-            {
-                lv_timer_handler();
-            }
-        ```
-10. Additional project setting :
-	- Select **Project** > **Properties** > **C/C++ General** > **Paths and Symbols** > Add **XIP_BOOT_HEADER_DCD_ENABLE** with value **1**,
-	- Select **Project** > **Properties** > **C/C++ General** > **Paths and Symbols** > Add **SKIP_SYSCLK_INIT** don't set the value.
-	- Select **Project** > **Properties** > **C/C++ Build** > **MCU Setting** 
-		- Remove **RAM4** NCACHE_REGION
-		- Modify **RAM3** SRAM_OC into NCACHE_REGION
-	- Select **Project** > **Properties** > **C/C++ Build** > **Settings** > **MCU Linker** > **Managed Linker Script**
-		- Modify `Stack` -> `SRAM_DTC` -> `0x200`
-		- Modify `Heap` -> `SRAM_DTC` -> `0x800`
-		- Add `*(CodeQuickAccess)` -> `SRAM_ITC` -> `.data`
-		- Add `*(DataQuickAccess)` -> `SRAM_DTC` -> `.data`
-		- Add `*(NonCacheable.init)` -> `NCACHE_REGION` -> `.data`
-		- Add `*(NonCacheable)` -> `NCACHE_REGION` -> `.bss`
-		- Add `*(BOARD_SDRAM)` -> `BOARD_SDRAM` -> `.bss` 
-	- Select **Project** > **Properties** > **C/C++ Build** > **Settings** > **MCU C Compiler** > **Miscellaneous** > **Library Header** > **NewlibNano (Auto)**
-	- Select **Project** > **Properties** > **C/C++ Build** > **Settings** > **MCU Assembler** > **Architeture & Headers** > **Library Header** > **NewlibNano (Auto)**
-	- Select **Project** > **Properties** > **C/C++ Build** > **Settings** > **MCU Linker** > **Managed Linker Script** > **Library** > **NewlibNano (nohost)**
-	- Select **Project** > **Properties** > **C/C++ Build** > **Settings** > **MCU C Compiler** > **Optimization** > **Optimization Level** > **Optimize most (-O3)**
+### Prerequisites
+
+- [MCUXpresso IDE](https://www.nxp.com/design/design-center/software/development-software/mcuxpresso-software-and-tools-/mcuxpresso-integrated-development-environment-ide:MCUXpresso-IDE) (v11.x or later recommended)
+- NXP MIMXRT1020-EVK board
+
+### Import the Project
+
+1. Open MCUXpresso IDE.
+2. Go to **File > Import...**.
+3. Select **General > Existing Projects into Workspace** and click **Next**.
+4. Click **Browse...** next to "Select root directory" and navigate to the `test_sdram_lpspi_edma_lcd_lvgl` folder.
+5. The project should appear in the project list. Make sure it is checked.
+6. Click **Finish**.
+
+### Build
+
+1. In the **Project Explorer**, right-click on the `test_sdram_lpspi_edma_lcd_lvgl` project.
+2. Select **Build Project** (or press **Ctrl+B**).
+3. The build output (`.axf` ELF file) will be generated in the `Debug/` folder.
+
+### Flash and Debug
+
+1. Connect the MIMXRT1020-EVK to your PC via the USB debug port.
+2. In MCUXpresso IDE, click the **Debug** button (bug icon) in the toolbar, or right-click the project and select **Debug As > MCUXpresso IDE LinkServer**.
+3. The debugger will flash the binary and halt at `main()`.
+4. Click **Resume (F8)** to run the application.
+
+### Changing the Demo
+
+The default demo is the Music Player. To switch demos, edit `source/lv_conf.h`:
+
+```c
+/* Enable one demo at a time */
+#define LV_USE_DEMO_MUSIC       1   /* Music Player (default) */
+#define LV_USE_DEMO_WIDGETS     0
+#define LV_USE_DEMO_BENCHMARK   0
+#define LV_USE_DEMO_STRESS      0
+```
+
+Then update the demo function call in `source/test_sdram_lpspi_edma_lcd_lvgl.c`:
+
+```c
+// lv_demo_music();
+lv_demo_widgets();
+```
+
+## LVGL Configuration Summary
+
+| Setting | Value |
+|---|---|
+| LVGL version | 9 |
+| Color depth | 16-bit (RGB565) |
+| Byte swap | Enabled (SPI byte order) |
+| Render mode | Partial (double-buffered) |
+| Heap size | 56 KB |
+| Refresh period | 20 ms (~50 FPS) |
+| Fonts | Montserrat 12, 16 |
