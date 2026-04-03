@@ -72,7 +72,23 @@ test_sdram_lpspi_edma_lcd_lvgl/
 - [MCUXpresso IDE](https://www.nxp.com/design/design-center/software/development-software/mcuxpresso-software-and-tools-/mcuxpresso-integrated-development-environment-ide:MCUXpresso-IDE) (v11.x or later recommended)
 - NXP MIMXRT1020-EVK board
 
-### Import the Project
+## Setup Instructions
+
+### 1. Clone LVGL v9
+```bash
+git clone https://github.com/lvgl/lvgl.git
+cd lvgl
+git checkout master
+```
+
+### 2. Add LVGL to Project
+Copy the cloned LVGL repository to the project's `test_sdram_lpspi_edma_lcd_lvgl/` folder:
+
+```bash
+cp -r lvgl test_sdram_lpspi_edma_lcd_lvgl/lvgl
+```
+
+### 3. Import the Project
 
 1. Open MCUXpresso IDE.
 2. Go to **File > Import...**.
@@ -81,20 +97,20 @@ test_sdram_lpspi_edma_lcd_lvgl/
 5. The project should appear in the project list. Make sure it is checked.
 6. Click **Finish**.
 
-### Build
+### 4. Build
 
 1. In the **Project Explorer**, right-click on the `test_sdram_lpspi_edma_lcd_lvgl` project.
 2. Select **Build Project** (or press **Ctrl+B**).
 3. The build output (`.axf` ELF file) will be generated in the `Debug/` folder.
 
-### Flash and Debug
+### 5. Flash and Debug
 
 1. Connect the MIMXRT1020-EVK to your PC via the USB debug port.
 2. In MCUXpresso IDE, click the **Debug** button (bug icon) in the toolbar, or right-click the project and select **Debug As > MCUXpresso IDE LinkServer**.
 3. The debugger will flash the binary and halt at `main()`.
 4. Click **Resume (F8)** to run the application.
 
-### Changing the Demo
+### 6. Changing the Demo
 
 The default demo is the Music Player. To switch demos, edit `source/lv_conf.h`:
 
